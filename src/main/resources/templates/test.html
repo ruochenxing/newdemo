@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>thymeleaf模板知识点介绍</title>
+</head>
+<body>
+    <div th:text="${msg}"></div>
+    <table width="60%" border="1">
+        <tr>
+            <td>id</td>
+            <td>用户名</td>
+            <td>密码</td>
+        </tr>
+        <tr th:each="u : ${userList}">
+            <td th:text="${u.uid}"></td>
+            <td th:text="${u.uname}"></td>
+            <td th:text="${u.pwd}"></td>
+        </tr>
+    </table>
+    <div th:utext="${html}"></div>
+
+</body>
+</html>

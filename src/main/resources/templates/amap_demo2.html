@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
+    <title>标注和标注图层-文字展示</title>
+    <link rel="stylesheet" href="https://a.amap.com/jsapi_demos/static/demo-center/css/demo-center.css"/>
+    <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+    <style>
+        html, body, #container {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+        }
+        .collision-btn.disable{
+            background-image: none;
+            color: lightgrey;
+            border-color: lightgrey;
+            cursor: not-allowed;
+        }
+        .collision-btn.disable:hover {
+            background-color: #fff;
+            border-color: lightgrey;
+        }
+        .input-card .btn{
+            margin-right: .8rem;
+        }
+
+        .title {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            padding: 0.5em 1em;
+            height: auto;
+            border-radius: 2px;
+            font-weight: 500;
+            font-size: 20px;
+            width: 307px;
+            margin-left: -153px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<h1>这是一个页面</h1>
+<div id="container"></div>
+<div class="title" style="touch-action: none; color: rgb(255, 255, 255); background: rgba(0, 0, 0, 0.5); font-size:
+16px; transform: translate(0px, 10px);">团购订单分布<span style="font-size: 14px;"></span></div>
+<script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=389880a06e3f893ea46036f030c94700"></script>
+<script type="text/javascript" src="https://a.amap.com/jsapi_demos/static/demo-center-v2/mock_data/yiqing-data.js"></script>
+<script type="text/javascript" src="https://a.amap.com/jsapi_demos/static/demo-center-v2/mock_data/cities.js"></script>
+
+<script type="text/javascript">
+var jsonObj;
+function getData(){
+    $.ajax({
+        type: 'GET',
+        url: "http://localhost:8080/getData",
+        cache: false,
+        async : false,
+        dataType: 'json',
+        success: function (result) {
+            jsonObj = result;
+        }
+    });
+    return jsonObj;
+};
+jsonObj = getData();
+</script>
+
+<script>
+var icon = {
+   type: 'image',
+   image: 'https://a.amap.com/jsapi_demos/static/demo-center/marker/express2.png',
+   size: [64, 30],
+   anchor: 'center',
+};
+var textStyle = {
+    fontSize: 12,
+    fontWeight: 'normal',
+    fillColor: '#fff',
+    padding: '2, 5',
+    backgroundColor: 'rgb(246,137,38)',
+    borderColor: '#fff',
+    borderWidth: 1,
+};
+</script>
+<script type="text/javascript">
+    var map = new AMap.Map('container', {
+        zoom: 15.8,
+        center: [121.425621, 31.018238],
+        showIndoorMap: false,
+    });
+    var bgImage = document.getElementById('bgImage');
+    var bgCanvas;
+    var bgCanvasCtx;
+
+    var markers = [];
+    var layer = new AMap.LabelsLayer({
+        zooms: [3, 20],
+        zIndex: 10,
+        collision: false,
+        allowCollision: false,
+    });
+    layer.add(markers);
+    // 图层添加到地图
+    map.add(layer);
+    
+    var colorLegend = {
+      1: '#f9c02f',
+      3: '#f5a54f',
+      5: '#f18334',
+      10: '#cc5f42',
+      20: '#a94d36',
+      100: '#792a17',
+    };
+
+    // 初始化 labelMarker
+    for (var map_obj of jsonObj) {
+       var key = map_obj.key;
+       var value = map_obj.list;
+       var size = map_obj.size;
+       for(var item of value){
+           var color = getColorByNumber(size);
+           textStyle.backgroundColor = color;
+            var marker = new AMap.LabelMarker({
+                name: key,
+                position: [item.lng, item.lat],
+                zIndex: item.num,
+                text: {
+                    content: key + "|共" + size + "单",
+                    direction: 'center',
+                    style: textStyle,
+                }
+            });
+            markers.push(marker);        
+       }
+    }
+
+    layer.add(markers);
+
+    function findInCities(name){
+        for(const city of citiesData){
+            if(name === city.name){
+                return city;
+            }
+        }
+    }
+
+    function getColorByNumber(number){
+        var color;
+
+        for(var key in colorLegend){
+            if(colorLegend.hasOwnProperty(key)){
+                if(number < parseInt(key)){
+                    color = colorLegend[key];
+                    break;
+                }
+            }
+        }
+        return color;
+    }
+</script>
+</body>
+</html>

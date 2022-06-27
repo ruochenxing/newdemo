@@ -1,0 +1,291 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
+    <title>团购订单分布</title>
+    <link rel="stylesheet" href="https://a.amap.com/jsapi_demos/static/demo-center/css/demo-center.css"/>
+    <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+    <style>
+        html, body, #container {
+            height: 88%;
+            width: 100%;
+            margin: 0;
+        }
+        li{ list-style:none; height:24px; background-color:#CC3399; width:150px; margin-bottom:5px; line-height:24px; padding-left:4px; font-size:14px;}
+        li:hover{ background-color:#99CC00; color:#CC3399; cursor:pointer;}
+    </style>
+</head>
+<body>
+<center>
+<textarea id="chooseMarkers" cols="200" rows ="5"></textarea>
+<br/>
+<button type="button" id="exportButton" onclick="exportData()">导出数据</button>
+<button type="button" id="clearButton" onclick="clearData()">清除数据</button>
+<h1 class="title" style="margin-top:50px" >团购订单分布<span id = "tips" style="color:red"></tips></h1>
+<br/>
+<div style="margin-top:10px;clear:both">
+    <input id="file" name="filename" type="file">
+    <button id="btn" type="button">点击上传</button>
+    <!--
+    <select style="height:25px;width:60px;" id="pageSelect"> 
+        <option value="1">第1页</option>
+        <option value="2">第2页</option>
+        <option value="3">第3页</option>
+        <option value="4">第4页</option>
+        <option value="5">第5页</option>
+        <option value="6">第6页</option>
+        <option value="7">第7页</option>
+        <option value="8">第8页</option>
+        <option value="9">第9页</option>
+        <option value="10">第10页</option>
+    </select>
+    -->
+</div>
+<br/>
+</center>
+<div id="container"></div>
+<script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=389880a06e3f893ea46036f030c94700"></script>
+
+<script type="text/javascript">
+var details_file = "[[${details_file}]]";
+var jsonObj;
+var map;
+var mapData = new Map();
+var currentName;
+var currentMarker;
+var chooseMapData = new Map();
+var currentPage = [[${currentPage}]];
+
+map = new AMap.Map('container', {
+    zoom: 10,
+    center: [121.425621, 31.018238],
+    showIndoorMap: false,
+});
+var bgImage = document.getElementById('bgImage');
+var bgCanvas;
+var bgCanvasCtx;
+
+var markers = [];
+var layer = new AMap.LabelsLayer({
+    zooms: [3, 20],
+    zIndex: 10,
+    collision: false,
+    allowCollision: false,
+});
+layer.add(markers);
+// 图层添加到地图
+map.add(layer);
+
+var colorLegend = {
+  1: '#f9c02f',
+  3: '#f5a54f',
+  5: '#f18334',
+  10: '#cc5f42',
+  20: '#a94d36',
+  100: '#792a17',
+};
+
+var icon = {
+   type: 'image',
+   image: 'https://a.amap.com/jsapi_demos/static/demo-center/marker/express2.png',
+   size: [64, 30],
+   anchor: 'center',
+};
+var textStyle = {
+    fontSize: 12,
+    fontWeight: 'normal',
+    fillColor: '#fff',
+    padding: '2, 5',
+    backgroundColor: 'rgb(246,137,38)',
+    borderColor: '#fff',
+    borderWidth: 1,
+};
+    
+//异步上传文件
+var $file = $('#file');
+$('#btn').click(function() {
+    $("#btn").text("数据处理中,请稍后...");
+    $("#btn").attr("disabled", true);
+    var data = new FormData();
+    data.append('filename', $file[0].files[0]);
+    var xhr = new XMLHttpRequest();
+    xhr.open('post', 'https://127.0.0.1:443/upload');
+    xhr.onload = function(e) {
+        // alert("解析成功" + e.currentTarget.response);
+        if(e.currentTarget.response.indexOf("error") != -1){
+            alert(e.currentTarget.response);
+            return;
+        }
+        else{
+            details_file=e.currentTarget.response;
+            jsonObj = getData(1);
+            $("#btn").attr("disabled", false);
+            $("#btn").text("点击上传");
+        }
+    };
+    xhr.send(data);
+});
+function getData(page){
+    currentPage = page;
+    $.ajax({
+        type: 'POST',
+        url: "https://127.0.0.1:443/getData",
+        cache: false,
+        async : false,
+        dataType: 'json',
+        data:{
+            "filename":details_file,
+            "currentPage":currentPage,
+        },
+        success: function (result) {
+            jsonObj = result;
+            addAllMarker();
+        }
+    });
+    return jsonObj;
+};
+function choose(){
+    var contents = mapData.get(currentName);
+    chooseMapData.set(currentName, contents);
+    var tmp = [];
+    chooseMapData.forEach(function (value, key, map) {
+        for(var c of value){
+            tmp.push(c.address+"|"+c.tuanId);
+        };
+    });
+    $("#chooseMarkers").text(tmp.join(","));
+    $("#exportButton").text("导出"+tmp.length+"条数据");
+};
+function cancel(){
+    var contents = mapData.get(currentName);
+    chooseMapData.delete(currentName)
+    var tmp = [];
+    chooseMapData.forEach(function (value, key, map) {
+        for(var c of value){
+            tmp.push(c.name + "|"+c.num+"|"+c.person+"|"+c.phone+"|"+c.address+"|"+c.subNumber+"|"+c.tuanId);
+        };
+    });
+    $("#chooseMarkers").text(tmp.join("\n"));
+    $("#exportButton").text("导出"+tmp.length+"条数据");
+};
+function clearData(){
+    chooseMapData = new Map();
+    var tmp = [];
+    chooseMapData.forEach(function (value, key, map) {
+        for(var c of value){
+            tmp.push(c.name + "|"+c.num+"|"+c.person+"|"+c.phone+"|"+c.address+"|"+c.subNumber+"|"+c.tuanId);
+        };
+    });
+    $("#chooseMarkers").text(tmp.join("\n"));
+    $("#exportButton").text("导出数据");
+};
+function exportData(){
+    var tmp = [];
+    chooseMapData.forEach(function (value, key, map) {
+        for(var c of value){
+            tmp.push(c);
+        };
+    });
+    var temp_form = document.createElement("form");
+    temp_form.action="https://127.0.0.1:443/export";
+    temp_form.method="post";
+    temp_form.style.display="none";
+    var param = document.createElement("textarea");
+    param.name="data";
+    param.value=JSON.stringify(tmp);
+    temp_form.appendChild(param);
+    document.body.appendChild(temp_form);
+    temp_form.submit();
+};
+function rightClick(e){
+    currentName = e.data.data.name;
+    currentMarker = e.target;
+    // 菜单内容
+    var content = [
+        '<div>',
+            '<ul>',
+                '<li onclick="choose()">选择导出</li>',
+                '<li onclick="cancel()">取消导出</li>',
+                '</ul>',
+        '</div>'
+    ];
+    var contextMenu = new AMap.ContextMenu({
+        isCustom: true, 
+        content: content.join('')
+    });
+    contextMenu.open(map, e.target.getPosition());
+};
+// 声明点击事件的回调函数
+function onClick(e){
+    // 信息窗体的内容
+    var contents = mapData.get(e.data.data.name);
+    contents_new = [];
+    for(var c of contents){
+        contents_new.push(c.name + "|"+c.num+"|"+c.person+"|"+c.phone+"|"+c.address+"|"+c.subNumber+"|"+c.tuanId);
+    }
+    var infoWindow = new AMap.InfoWindow({
+       content: contents_new.join("<br>")
+    });
+    infoWindow.open(map, e.target.getPosition());
+};
+function addOneMarker(key, item, size, value){
+    var marker = new AMap.LabelMarker({
+        name: key,
+        position: [item.lng, item.lat],
+        zIndex: item.num,
+        text: {
+            content: key + "|共" + size + "单",
+            direction: 'center',
+            style: textStyle,
+        },
+    });
+    mapData.set(key + "|共" + size + "单", value);
+    marker.on('click', onClick);
+    marker.on('rightclick', rightClick);
+    markers.push(marker);    
+};
+function addAllMarker(){
+    map.clearMap();
+    markers = [];
+    // 图层添加到地图
+    var count = 0;
+    // 初始化 labelMarker
+    if(typeof(jsonObj) != 'undefined' && jsonObj != ''){
+        for (var map_obj of jsonObj) {
+           var key = map_obj.key;
+           var value = map_obj.list;
+           var size = map_obj.size;
+           for(var item of value){
+               var color = getColorByNumber(size);
+               textStyle.backgroundColor = color;
+               addOneMarker(key, item, size, value);
+           }
+           count = count + size;
+        }
+    }
+    layer.add(markers);
+    map.add(layer);
+    $("#tips").text("（共有订单 " + count + "个）");
+};
+function getColorByNumber(number){
+    var color;
+
+    for(var key in colorLegend){
+        if(colorLegend.hasOwnProperty(key)){
+            if(number < parseInt(key)){
+                color = colorLegend[key];
+                break;
+            }
+        }
+    }
+    return color;
+};
+getData(currentPage);
+$("#pageSelect").change(function(){
+    getData($(this).val());
+});
+</script>
+</body>
+</html>
